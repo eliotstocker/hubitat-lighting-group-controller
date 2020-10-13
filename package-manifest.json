@@ -1,0 +1,47 @@
+{
+  "packageName": "Physical Light Control",
+  "author": "Eliot Stocker",
+  "version": "1.0.0",
+  "minimumHEVersion": "0.0",
+  "dateReleased": "2020-10-14",
+  "apps": [
+    {
+      "id": "f2162fd4-d6a7-4f4d-82bf-c232ae731438",
+      "name": "Physical Light Control",
+      "namespace": "piratemedia",
+      "location": "https://raw.githubusercontent.com/eliotstocker/hubitat-physical-light-control/main/manager.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": true
+    },
+    {
+      "id": "b695519e-33a7-4e10-85cc-2303ff8168a5",
+      "name": "Physical Light Control Button Setup",
+      "namespace": "piratemedia",
+      "location": "https://raw.githubusercontent.com/eliotstocker/hubitat-physical-light-control/main/button-setup.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": false
+    },
+    {
+      "id": "970d527a-5601-4018-9534-df6ba8a2ddf8",
+      "name": "Physical Light Control Button Time Settings",
+      "namespace": "piratemedia",
+      "location": "https://raw.githubusercontent.com/eliotstocker/hubitat-physical-light-control/main/button-time-settings.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": false
+    },
+    {
+      "id": "17b8deb5-d862-40d6-a15e-0cb291b1d732",
+      "name": "Physical Light Control Single Light Settings",
+      "namespace": "piratemedia",
+      "location": "https://raw.githubusercontent.com/eliotstocker/hubitat-physical-light-control/main/single-light-settings.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": false
+    }
+  ],
+  "licenseFile": "https://raw.githubusercontent.com/eliotstocker/hubitat-physical-light-control/main/LICENSE",
+  "documentationLink": "https://github.com/eliotstocker/hubitat-physical-light-control/blob/main/README.md"
+}
