@@ -5,6 +5,7 @@
   "minimumHEVersion": "0.0",
   "dateReleased": "2021-02-27",
   "releaseNotes": "Completely Rewritten from the group up specifically for hubitat!\n\n*Now includes a sweet new Snapshot Beta Feature!",
+  "communityLink": "https://community.hubitat.com/t/release-lighting-group-controller/66682",
   "apps": [
     {
       "id": "f2162fd4-d6a7-4f4d-82bf-c232ae731438",
