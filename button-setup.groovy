@@ -854,14 +854,14 @@ def migrate(dryRun = false) {
         def grandChildren = child.getChildApps()
         if(grandChildren.size()) {
             grandChildren.forEach{ gc ->
-                log.debug "Deleting: ${gc.label}(${gc.id})"
+                log.debug "Delete: ${gc.label}(${gc.id})"
                 if(!dryRun) {
                     child.deleteChildApp(gc.id)
                 }
             }
         }
 
-        log.debug "Deleting: ${child.label}(${child.id})"
+        log.debug "Delete: ${child.label}(${child.id})"
         if(!dryRun) {
             deleteChildApp(child.id)
         }
@@ -1109,6 +1109,11 @@ def setLightState(input) {
         } else {
             light.on()
         }
+    }
+
+    //if we have no settings to pass, just turn the light on
+    if(!lState.color && !lState.level && !lState.temp) {
+        return light.on()
     }
 
     def setColor = false
