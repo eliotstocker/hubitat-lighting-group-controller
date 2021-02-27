@@ -1,7 +1,7 @@
 /**
- *  Light Physical Control
+ *  Lighting Group Controller
  *
- *  Copyright 2018 Eliot Stocker
+ *  Copyright 2021 Eliot Stocker
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -14,39 +14,43 @@
  *
  */
 definition(
-        name: "Physical Light Control",
+        name: "Lighting Group Manager",
         namespace: "piratemedia",
         author: "Eliot Stocker",
-        description: "Create automations to set light states based on physical button presses",
+        description: "Application to enable control of a group of lights based on physical/virtual Buttons",
         category: "Convenience",
         iconUrl: "https://raw.githubusercontent.com/eliotstocker/SmartThings-LightPhysicalControl/master/logo-small.png",
         iconX2Url: "https://raw.githubusercontent.com/eliotstocker/SmartThings-LightPhysicalControl/master/logo.png",
         singleInstance: true
 )
 
-
 preferences {
-    page(name: "mainPage", title: "Light Control Setups", install: true, uninstall: true) {
+    page(name: "mainPage")
+}
+
+def mainPage() {
+    migrate()
+
+    return dynamicPage(name: "mainPage", title: "Lighting Group Controller", install: true, uninstall: true) {
         section {
-            app(name: "lightSetup", appName: "Light Physical Button Setup", namespace: "piratemedia", title: "New Light Setup", multiple: true)
+            app(name: "lightingGroupSetup", appName: "Lighting Group Controller", namespace: "piratemedia", title: "New Lighting Group Setup", multiple: true)
         }
     }
 }
 
 def installed() {
-    log.debug "Installed with settings: ${settings}"
-
     initialize()
 }
 
 def updated() {
-    log.debug "Updated with settings: ${settings}"
-
-    unsubscribe()
-    initialize()
+    log.debug "App: ${app.name}"
 }
 
-def initialize() {
-    // TODO: dont need to do anything here?
+def migrate() {
+    if(app.name != "Lighting Group Manager") {
+        app.updateName("Lighting Group Manager")
+        if(app.label == "Light Physical Control") {
+            app.updateLabel("Lighting Group Manager")
+        }
+    }
 }
-
