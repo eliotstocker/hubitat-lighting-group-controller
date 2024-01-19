@@ -97,8 +97,14 @@ def prefMainMenu() {
     }
 }
 
-def prefButtonSetup() {
+def prefButtonSetup(params) {
     clearTempPrefs()
+    if(params && params.vswitch == "add") {
+        addVirtualSwitch()
+    } else if(params && params.vswitch == "remove") {
+        removeVirtualSwitch()
+    }
+    
     return dynamicPage(name: "prefButtonSetup", title: "Group: ${app.label} | Remote", nextPage: "prefMainMenu") {
         section("Select the button you wish to use") {
             input "button", "capability.pushableButton", title: "Button", submitOnChange: true, multiple: false
@@ -114,6 +120,85 @@ def prefButtonSetup() {
                         input "dimButton", "enum", title: "Which Button should Dim the Lights", options: getButtonOptions(), required: true
                     }
                 }
+            }
+            
+            if(hasVirtualSwitch()) {
+                href(name: "removeSwitch", title: "Remove Virtual Switch", required: false, page: "prefButtonSetup", description: "remove the virtual switch device which is currently snyced to the lights status", params: [vswitch: "remove"])
+            } else {
+                href(name: "addSwitch", title: "Add Virtual Switch", required: false, page: "prefButtonSetup", description: "add a virtual switch device which will be snyced to the lights status", params: [vswitch: "add"])
+            }
+        }
+    }
+}
+
+def addVirtualSwitch() {
+    def vswitch = addChildDevice("hubitat", "Virtual Switch", generateID(), null, [name: "Lighting Group Switch", label: "${app.label} Lighting Group"])
+    subscribe(vswitch, "switch", virtualSwitchStateChange)
+}
+
+def removeVirtualSwitch() {
+    getChildDevices().each{
+        deleteChildDevice(it.deviceNetworkId)
+    }
+}
+
+def hasVirtualSwitch() {
+    return getChildDevices().size() > 0
+}
+
+def getVirtualSwitch() {
+    return getChildDevices()[0]
+}
+
+def ignoreVirtualSwitchAction() {
+    state.ignoreNextAction = true
+}
+
+def virtualSwitchStateChange(event) {
+    if(state.ignoreNextAction) {
+        state.ignoreNextAction = false
+        return
+    }
+    
+    log.debug "something bad happened"
+
+    if(event.value == "on") {
+        def activeTimedAction = getCurrentActiveTimedAction()
+
+        if (activeTimedAction) {
+            return runTimedAction(activeTimedAction.id)
+        }
+
+        return runTopAction()
+    }
+    
+    if(event.value == "off") {
+        return setLightingOff()
+    }
+}
+
+def updateLightingState(event) {
+    if(hasVirtualSwitch()) {
+        def vSwitch = getVirtualSwitch()
+        def vSwitchOn = vSwitch.currentValue("switch") == "on"
+    
+        def anyLightsOn = lights.any {it.currentValue("switch") == "on"}
+    
+        if(vSwitchOn != anyLightsOn) {
+            ignoreVirtualSwitchAction()
+            if(!vSwitchOn) {
+                vSwitch.on()
+            } else {
+                vSwitch.off()
+            }
+        }
+    }
+    
+    if(state.rotation) {
+        state.rotation.each{ rotating ->
+            def light = lights.find { it.id == rotating.key }
+            if(light.currentValue("switch") == "off") {
+                endRotation()
             }
         }
     }
@@ -196,6 +281,7 @@ def prefAdvancedSettings() {
             input "orderedactions", "bool", title: "Turn lights on/off in order", defaultValue: false
             input "interlightdelay", "number", title: "Inter Light Delay (ms)", range: "10..1000", defaultValue: 100
             input "sendOnCommand", "bool", title: "Send On Command (When Level and/or color temp set)", defaultValue: false
+            input "rotationSpeed", "enum", title: "Speed setting for Color Rotation", options: [0.25: "Super Slow", 0.5: "Slow", 1: "Medium", 3: "Fastish", 6: "Pretty Fast", 15: "Fast"], defaultValue: 1
         }
         section("Operation") {
             input "disable", "bool", title: "Pause Button Opperations (Use this to temperarity disable button opperation)", defaultValue: false
@@ -278,22 +364,28 @@ def prefIndividualLightSetting(params) {
                 paragraph("<sub>you may wish to default a light to off, but turn on for specific timed modes...</sub>")
                 base.individualSettings[l].on = __i_on == null ? (installed ? base.individualSettings[l].on : true) : __i_on
 
-                if(checkForCapability("ChangeLevel", l)) {
-                    input "__i_level", "number", title: "Light Brightness", range: "1..100", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].level : null
-                    if(l) {
-                        base.individualSettings[l].level = __i_level
+                if(base.individualSettings[l].on) {
+                    if(checkForCapability("ChangeLevel", l)) {
+                        input "__i_level", "number", title: "Light Brightness", range: "1..100", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].level : null
+                        if(l) {
+                            base.individualSettings[l].level = __i_level
+                        }
                     }
-                }
-                if(checkForCapability("ColorTemperature", l)) {
-                    input "__i_temp", "number", title: "Light Color Temperature", range: "2200..6500", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].temp : null
-                    if(__i_temp) {
-                        base.individualSettings[l].temp = __i_temp
+                    if(checkForCapability("ColorTemperature", l)) {
+                        input "__i_temp", "number", title: "Light Color Temperature", range: "2200..6500", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].temp : null
+                        if(__i_temp) {
+                            base.individualSettings[l].temp = __i_temp
+                        }
                     }
-                }
-                if(checkForCapability("ColorControl", l)) {
-                    input "__i_color", "color", title: "Color", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].color : null
-                    if(__i_color) {
-                        base.individualSettings[l].color = __i_color
+                    if(checkForCapability("ColorControl", l)) {
+                        input "__i_color", "color", title: "Color", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].color : null
+                        if(__i_color) {
+                            base.individualSettings[l].color = __i_color
+                        }
+                        input "__i_color_rotate", "bool", title: "Rotate colors through sectrum whilst on", required: false, submitOnChange: true, defaultValue: installed ? base.individualSettings[l].rotate : false
+                        if(__i_color_rotate != null) {
+                            base.individualSettings[l].rotate = __i_color_rotate
+                        }
                     }
                 }
             }
@@ -327,6 +419,13 @@ def prefTimedSettingSetup(params) {
     ]
 
     def showIndividual = false
+        
+    if(params && params.remove && params.id && state.__editingTimed && state.__editingTimed.index != null) {
+        def ts = state.timedSettings[state.__editingTimed.index]
+        ts.individualSettings.remove(params.id)
+        state.timedSettings[(int)state.__editingTimed.index] = ts
+    }
+    
     if(state.__editingTimed) {
         showIndividual = true
         params = state.__editingTimed
@@ -339,10 +438,6 @@ def prefTimedSettingSetup(params) {
 
         this.__t_index = params.index
         app.updateSetting("__t_index", [type: "number", value: params.index])
-    }
-
-    if(installed && params && params.remove && params.id) {
-        state.timedSettings[params.index].individualSettings.remove(params.id)
     }
 
     if(params && params.snapshot) {
@@ -584,6 +679,7 @@ def clearTempPrefs(individual) {
     app.updateSetting("__i_level", [type: "number", value: ""])
     app.updateSetting("__i_temp", [type: "number", value: ""])
     app.updateSetting("__i_color", [type: "color", value: ""])
+    app.updateSetting("__i_color_rotate", [type: "bool", value: ""])
     if(individual) {
         return
     }
@@ -591,9 +687,9 @@ def clearTempPrefs(individual) {
     app.updateSetting("__t_label", [type: "text", value: ""])
     app.updateSetting("__t_index", [type: "number", value: ""])
     app.updateSetting("__t_startType", [type: "enum", value: ""])
-    app.updateSetting("__t_start", [type: "time", value: ""])
+    app.clearSetting("__t_start")
     app.updateSetting("__t_endType", [type: "enum", value: ""])
-    app.updateSetting("__t_end", [type: "time", value: ""])
+    app.clearSetting("__t_end")
     app.updateSetting("__t_level", [type: "number", value: ""])
     app.updateSetting("__t_temp", [type: "number", value: ""])
     app.updateSetting("__t_color", [type: "color", value: ""])
@@ -746,6 +842,7 @@ def installed() {
 
 def updated() {
     initialize()
+    subscribe(lights, "switch", updateLightingState)
 }
 
 def initialize() {
@@ -766,6 +863,11 @@ def initialize() {
     subscribe(button, "pushed", buttonPressed)
     subscribe(button, "held", buttonHeld)
     subscribe(button, "released", buttonReleased)
+    subscribe(lights, "switch", updateLightingState)
+    
+    if(hasVirtualSwitch()) {
+        subscribe(getVirtualSwitch(), "switch", virtualSwitchStateChange)
+    }
 }
 
 def upgradeIfRequired() {
@@ -885,10 +987,11 @@ def buttonPressed(evt) {
         log.info "Button ${app.label} is Disabled..."
         return
     }
+    
+    endRotation();
 
     def buttonNumber = evt.value;
     if (buttonNumber == offBtnNumber) {
-        // Off Button Pressed
         return setLightingOff()
     }
 
@@ -925,7 +1028,7 @@ def buttonHeld(evt) {
     }
 
     def buttonNumber = evt.value;
-    def dimmable = getDevicesWithCapability("ChangeLevel");
+    def dimmable = getOnDevices(getDevicesWithCapability("ChangeLevel"));
 
     switch(buttonNumber) {
         case dimButton:
@@ -953,7 +1056,7 @@ def buttonReleased(evt) {
 
     def buttonNumber = evt.value;
 
-    def dimmable = getDevicesWithCapability("ChangeLevel");
+    def dimmable = getOnDevices(getDevicesWithCapability("ChangeLevel"));
 
     dimmable.each {it.stopLevelChange()};
 }
@@ -972,6 +1075,10 @@ def getDeviceNameFromId(id) {
         return selected.label
     }
     return "Unknown Device"
+}
+
+def getOnDevices(list) {
+    return list.findAll { it.currentValue("switch") == "on" }
 }
 
 def checkDeviceForCapability(dev, capability) {
@@ -1050,7 +1157,7 @@ def runDimQuickAction() {
     if(!onDimPress) {
         return
     }
-
+    
     if(onDimPress == "main") {
         return runTopAction()
     }
@@ -1099,29 +1206,30 @@ def setLightOffAsync(light, order) {
 def setLightState(input) {
     def lState = input['state']
     def light = lights.find {it.id == input['light']}
-
-
-    if(sendOnCommand || (!(lState.color && lState.color != "#000000" && checkDeviceForCapability(light, "ColorControl"))
-            && !(lState.level && checkDeviceForCapability(light, "SwitchLevel"))
-            && !(lState.temp && checkDeviceForCapability(light, "ColorTemperature")))) {
-        if(onlyLog) {
-            log.debug "${input['light']} | Turn On"
-        } else {
-            light.on()
-        }
+    
+    if(onlyLog) {
+        log.debug "${input['light']} | Turn On"
     }
 
     //if we have no settings to pass, just turn the light on
     if(!lState.color && !lState.level && !lState.temp) {
         return light.on()
     }
+    
+    if(sendOnCommand && !onlyLog) {
+        light.on()
+    }
 
-    def setColor = false
+    def setColor = false;
+    def hue = 0;
+    def on = false;
 
     if(lState.color && lState.color != "#000000" && checkDeviceForCapability(light, "ColorControl")) {
         def rgb = ColorUtils.hexToRGB(lState.color)
         def hsv = ColorUtils.rgbToHSV(rgb)
-        def colorMap = [hue: hsv[0], saturation: hsv[1], level: lState.level ? lState.level : hsv[2]]
+        hue = hsv[0]
+        
+        def colorMap = [hue: hue, saturation: hsv[1], level: lState.level ? lState.level : hsv[2]]
 
         if(onlyLog) {
             log.debug "${input['light']} | Set Color: ${lState.color}"
@@ -1129,6 +1237,7 @@ def setLightState(input) {
             light.setColor(colorMap)
         }
         setColor = true
+        on = true
     }
 
     if(lState.level && checkDeviceForCapability(light, "SwitchLevel")) {
@@ -1137,6 +1246,7 @@ def setLightState(input) {
         } else {
             light.setLevel(lState.level, 0)
         }
+        on = true
     }
 
     if(lState.temp && checkDeviceForCapability(light, "ColorTemperature") && !setColor) {
@@ -1145,12 +1255,62 @@ def setLightState(input) {
         } else {
             light.setColorTemperature(lState.temp)
         }
+        on = true
+    }
+       
+    if(!on) {
+        if(onlyLog) {
+            log.debug "${input['light']} | Set to On"
+        } else {
+            light.on()
+        }
+        on = true
+    }
+    
+    if(lState.rotate && setColor && !onlyLog) {
+        def rotationState = state.rotation ? state.rotation : [:]
+        rotationState[input['light']] = hue
+        state.rotation = rotationState
+        beginRotation()
+    }
+}
+
+def beginRotation() {
+    runIn(5, rotationStartTimeout)
+    state.rotationStartTimeout = true
+    schedule('*/4 * * ? * *', performRotation)
+}
+
+def endRotation() {
+    if(!state.rotationStartTimeout) {
+        unschedule(performRotation)
+        state.rotation = null
+    }
+}
+
+def rotationStartTimeout() {
+    state.rotationStartTimeout = false
+}
+
+def performRotation() {
+    def speed = rotationSpeed ? Integer.parseInt(rotationSpeed) : 1
+    state.rotation.each{entry ->
+        def id = entry.key
+        def hue = entry.value + speed
+        def light = lights.find {it.id == id}
+        
+        if(hue > 100) {
+            hue = 0;
+        }
+                
+        state.rotation[id] = hue
+        light.setHue(hue)
     }
 }
 
 def setLightOff(id) {
     def light = lights.find { it.id == id }
-
+    
     if(onlyLog) {
         log.debug "${id} | Turn Off"
     } else {
@@ -1193,7 +1353,7 @@ def runTimedAction(id) {
 
             if(!data) {
                 //No Specific Settings for this light
-                return setLightStateAsync(settings, light, i)
+                return setLightStateAsync(computeSettings(settings, topSettings), light, i)
             }
 
             if(!data.on) {
@@ -1236,6 +1396,9 @@ def computeSettings(Map... settingsArray) {
         }
         if(it.temp != null) {
             settings.temp = it.temp
+        }
+        if(it.rotate != null) {
+            settings.rotate = it.rotate
         }
     }
 
@@ -1281,7 +1444,7 @@ def snapshotConfiguration() {
     ]
 
     // if not all color lights have a color then ignore at top level
-    if(color.size() > 0 && color.size() == getDevicesWithCapability("ColorControl").size()) {
+    if(color && color.size() > 0 && color.size() == getDevicesWithCapability("ColorControl").size()) {
         top.color = getPopularElement(vals.color)
     }
 

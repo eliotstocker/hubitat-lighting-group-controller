@@ -1,10 +1,10 @@
 {
   "packageName": "Lighting Group Controller",
   "author": "Eliot Stocker",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "minimumHEVersion": "0.0",
-  "dateReleased": "2021-02-27",
-  "releaseNotes": "Completely Rewritten from the group up specifically for hubitat!\n\n*Now includes a sweet new Snapshot Beta Feature!",
+  "dateReleased": "2024-01-19",
+  "releaseNotes": "Just tweaks and fixes, maybe a few new features etc if you look hard!",
   "communityLink": "https://community.hubitat.com/t/release-lighting-group-controller/66682",
   "apps": [
     {
